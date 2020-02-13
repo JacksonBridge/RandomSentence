@@ -1,32 +1,32 @@
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# ngram
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Jackson Hambridge
+#
+# This program will read in .txt files, as many as it is given, and use them to train a random
+# sentence generator.  Based on the probability of ngrams in the input data, sentences are
+# created and outputted.  The ngram is a 'phrase' of words, and can be selected by the user.
+# For example, in the sentence "My name is Jackson." the bigrams are "my name" "name is" "is Jackson"
+# and for each bigram, such as "my name" there is 100% chance of "is" being the next word.
+# For the sentence "My name is Jackson and his name is Jackson." there is 100% chance of "Jackson"
+# occurring after "name is" and a 50% chance of "and" or "." appearing after "is Jackson"
+#
+# Inputted data is stored in a 'history' dictionary which stores dictionaries of 'frequencies'.
+# From there, sentences are randomly generated with the random.choices() method.
+#
+# Input: ngramSize numOfSentences files
+# 
+# Example Input: 2 1 "Purple Guy.txt"
+# Example Output: Sean asked questions things that happened.
+#
+# Example Input: 3 3 "Purple Guy.txt" "The Neighbor.txt"
+# Example Output: Ashley grimaced at the sight of the bells on the way sean found it difficult to clean his room and watch tv.
+#                 Why.
+#                 For sure sean says trying to think twice. 
+
 import sys
 import re
 import random
-
-# An array of all different kinds of words
-global wordType
-# An array of all ngrams
-global ngram
-# A 2D array of frequencies
-global freq
-
-
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-# getFreq1Given2
-# Get the frequency of word 1 given word 2
-def getFreq1Given2(word1,word2):
-    return freq[search(ngram," "+word2.lower())][search(wordType,word1.lower())]
-
-
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-# sumRow
-# Return the sum of all elements in an array
-def sumRow(someList):
-    total=0
-    for i in someList:
-        total+=i
-    return total
 
 
 
@@ -37,19 +37,6 @@ def sub(find, replace, line):
     line=re.sub(find,replace,line)
     return line
 
-
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-# search
-# Search an array for a specific word. Return -1 if failed
-def search(line,char):
-    count=0
-    for tokens in line:
-        if tokens == char:
-            return count
-        count=count+1
-    return -1
-        
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -77,8 +64,11 @@ def replaceSpecialCharacters(line):
     line=sub("💜","",line)
     line=sub("<","",line)
     line=sub(">","",line)
-    line=sub("- ","",line)
-    line=sub("/","",line)    
+    line=sub("-"," ",line)
+    line=sub("—"," ",line)
+    line=sub("/","",line)
+    line=sub("\\ufeff","",line)
+    line=sub("_","",line)
     return line
 
 
@@ -93,10 +83,16 @@ m=int(sys.argv[2])
 # files - .txt files to read
 files=sys.argv[3:len(sys.argv)]
 
+print("This program will generate random sentences based on the way words appear sequentially in the input file(s).")
+print()
+print("ngram.py arguments")
+print("ngram size: " + str(n))
+print("Number of sentences: " + str(m))
+print("Files: " + str(files))
+print()
+
 # megaWords is all input from files
 megaWords=""
-
-print("Reading file...")
 
 # Read in file and add to megaWords
 for tokens in files:
@@ -108,14 +104,12 @@ count=0
 startStopTokens=""
 
 # Add <start> tokens to the beginning, depending on n
-while count < n:
-    startStopTokens=startStopTokens+ " <start> "
+while count < n-1:
+    startStopTokens=startStopTokens+ " <start>"
     count=count+1
 
-print("Replacing special characters...")
-
-megaWords=startStopTokens+replaceSpecialCharacters(megaWords)
-startStopTokens=" <end> " + startStopTokens
+megaWords=startStopTokens+" "+replaceSpecialCharacters(megaWords)
+startStopTokens=" <end>" + startStopTokens + " "
 
 # Replace puncutation
 megaWords=sub("\.",startStopTokens,megaWords)
@@ -126,111 +120,105 @@ megaWords=sub("\?",startStopTokens,megaWords)
 megaWords=str.split(megaWords)
 
 # Add one of each word used in the file to wordType
-wordType=[]
-ngram=[]
-skip=0
-i=n
-ngramTotal=[]
-freq=[[]]
+i=n-1
 
-print("Calculating ngrams...")
+# Prepare size dictionary (# of times an ngram is used)
+ngramSizeDictionary={
 
+}
+
+# Prepare ngram dictionary (ngram:wordFrequency)
+ngramDictionary={
+
+}
+
+# Loop through all input
 while i < len(megaWords):
     # Add one of each word used in the file to wordType
     #if search(wordType,megaWords[i])==-1:
-    wordType.append(megaWords[i])
-    previous=n
-    previousGram=""
+    currentWord=megaWords[i]
+    previous=n-1
+    history=""        
 
+    # Calculate ngram (history)
     while previous > 0:
-        previousGram=previousGram+" "+megaWords[i-previous]
+        history=history+" "+megaWords[i-previous]
         previous=previous-1
     i=i+1
 
-    location=search(ngram,previousGram)
-
-    if location==-1:
-        ngram.append(previousGram)
-        ngramTotal.append(1)
+    # If ngram is not already dictionary, add a word frequency of 1
+    if history not in ngramDictionary:
+        wordDict={
+            currentWord: 1
+        }
+        ngramDictionary[history]=wordDict
+        ngramSizeDictionary[history]=1
+    # If ngram is in dictionary but word is not in frequency, add a word frequency of 1
+    elif currentWord not in ngramDictionary[history]:
+        ngramDictionary[history][currentWord]=1
+        ngramSizeDictionary[history]+=1
+    # Otherwise, increment frequency
     else:
-        ngramTotal[location]+=1
-
-print("Calculating matrix...")
-
-rows,cols=(len(ngram),len(wordType))
-freq=[[0 for i in range(cols)] for j in range(rows)]
-
-i=n
-
-print("Calculating frequency...")
-
-while i < len(megaWords):
-    previous=n
-    previousGram=""
-    while previous > 0:
-        previousGram=previousGram+" "+megaWords[i-previous]
-        previous=previous-1
-    ngramLocation=search(ngram,previousGram)
-    wordTypeLocation=search(wordType,megaWords[i])
-    freq[ngramLocation][wordTypeLocation]=freq[ngramLocation][wordTypeLocation]+1/ngramTotal[ngramLocation]
-    i+=1
-
-i=0
-j=0
-
-#print("Calculating probability...")
-#
-#while i < len(freq):
-#    while j < len(freq[0]):
-#        freq[i][j]=freq[i][j]/ngramTotal[i]
-#        j+=1
-#    i+=1
-#    j=0
+        ngramDictionary[history][currentWord]+=1
+        ngramSizeDictionary[history]+=1
 
 
+
+# Prepare variables
 numOfSentences=0
 sentence=""
 currentWord=[]
 
-print("Generating sentences...")
+ngramFrequencyArray=[]
+ngramNameArray=[]
 
+# Store ngramFrequency and ngramNames as arrays
+for tokens in ngramSizeDictionary:
+    ngramFrequencyArray.append(ngramSizeDictionary[tokens])
+    ngramNameArray.append(tokens)
+
+# Generate m sentences
 while numOfSentences<m:
 
-    beginningTokens=sub("<end>","",startStopTokens)
-    for tokens in str.split(beginningTokens):
-        currentWord.append(tokens)
+    # Calculate starting token
+    currentNGram=sub("<end>","",startStopTokens)
 
+    sentence=str.split(currentNGram)
 
-    while currentWord[len(currentWord)-1] != "<end>":
-        previous=n
-        previousGram=""
+    while "<end>" not in sentence:
+        previous=n-1
+        history=""
         while previous > 0:
-            previousGram=previousGram+" "+currentWord[len(currentWord)-previous]
+            history=history+" "+sentence[len(sentence)-previous]
             previous=previous-1
-        
 
-        i=search(ngram,previousGram)
-        j=0
-        total=0
-        randy=random.random()
-        go=1
-        while go:
-            if (total+freq[i][j]) <= randy:
-                total+=freq[i][j]
-                j+=1
-            else:
-                go=0
-        currentWord.append(wordType[j])
+        frequencyArray=[]
+        wordArray=[]
+        # If unigram, calculate a random word from the history
 
+        for tokens in ngramDictionary[history]:
+            wordArray.append(tokens)
+            frequencyArray.append(ngramDictionary[history][tokens])
+        nextWord=random.choices(wordArray,frequencyArray)[0]
+
+        sentence.append(nextWord)
+
+
+    # Turn the sentence array into a randomSentence string
     randomSentence=""
-    for tokens in currentWord:
+    for tokens in sentence:
         if tokens != "<start>" and tokens != "<end>":
             randomSentence=randomSentence+" "+tokens
 
     randomSentence=randomSentence[1:len(randomSentence)]
 
-    print(randomSentence)
+    # Print random sentences
+    print(randomSentence.capitalize()+".")
     print()
+
+    # Reset variables
     randomSentence=""
     currentWord=[]
+
+    # Increment count
     numOfSentences+=1
